@@ -28,7 +28,7 @@ grs80_lat_lng = 'GRS80' #census shape file -- lat long
 wkn_lat_lng = '4326' # World Geodetic System used by GPS sats -- this is lat lng!!!
 google_crs = '3857' # WGS 84 / Pseudo-Mercator -- Spherical Mercator, Google Maps, OpenStreetMap, Bing, ArcGIS, ESRI
 
-fs_miles = 2
+fs_miles = 50
 fs_meters = fs_miles * 1609.34
 food_serving_area_radius = fs_meters
 print("food sources serve people within {} meters or {} miles".format(food_serving_area_radius, fs_miles))
@@ -41,6 +41,14 @@ bun_geo = bun_geo.drop(['AFFGEOID', 'ALAND', 'AWATER', 'BLKGRPCE',
                         'COUNTYFP', 'LSAD', 'NAME', 'STATEFP', 'TRACTCE' ], axis=1)
 
 # bun_geo = bun_geo.to_crs(epsg=mercator_crs)
+
+
+# f, ax = plt.subplots()
+# bun_geo.plot(ax=ax, cmap='gist_earth')
+# f.show()
+# f.savefig("generated_maps/buncombe_bg.png")
+
+
 print(bun_geo.crs)
 
 loc = geocoder.osm('52 Maney Ave, Asheville, NC').geojson
@@ -60,8 +68,17 @@ for index, row in bun_geo.iterrows():
         print("Found Target in {}".format(row['GEOID'], res))
         # containing = row['geometry']
 
-serving_area = pnt.buffer(food_serving_area_radius)
+serving_area = pnt.buffer(0.05)
 
+targ_pnts = gpd.GeoDataFrame([serving_area])
+targ_pnts.columns = ['geometry']
+targ_pnts.set_geometry('geometry')
+
+f, ax = plt.subplots(figsize=(8, 6))
+bun_geo.plot(ax=ax, cmap='BrBG', alpha=0.5, edgecolor='k')
+targ_pnts.plot(ax=ax, alpha=0.5, edgecolor='k')
+f.show()
+f.savefig("generated_maps/targ_with_bg.png")
 
 for index, row in bun_geo.iterrows():
     res = serving_area.intersection(row['geometry'])
