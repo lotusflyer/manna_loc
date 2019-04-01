@@ -22,6 +22,9 @@ def add_basemap(ax, zoom, url='http://tile.stamen.com/terrain/tileZ/tileX/tileY.
     # restore original x/y limits
     ax.axis((xmin, xmax, ymin, ymax))
 
+# address to examine
+target_address = '627 Swannanoa River Road Asheville, NC 28805-2445'
+
 # naming some of the projections we care about
 mercator_crs = '3784' # mercator project distance in meters
 grs80_lat_lng = 'GRS80' #census shape file -- lat long
@@ -51,37 +54,35 @@ bun_geo = bun_geo.drop(['AFFGEOID', 'ALAND', 'AWATER', 'BLKGRPCE',
 
 print(bun_geo.crs)
 
-loc = geocoder.osm('52 Maney Ave, Asheville, NC').geojson
+target_loc= gpd.tools.geocode([target_address],
+                             provider='nominatim',)
 
-# print(loc)
-targ_latlng = loc['features'][0]['geometry']['coordinates']
-print(targ_latlng)
-print(type(targ_latlng))
+# we have a successful geocode
+assert len(target_loc) > 0
 
-pnt = Point(targ_latlng[0], targ_latlng[1])
 
-# containing = None
+bun_geo['within'] = target_loc.within(bun_geo)
+print(bun_geo[bun_geo['within'] == True])
 
-for index, row in bun_geo.iterrows():
-    res = pnt.within(row['geometry'])
-    if res:
-        print("Found Target in {}".format(row['GEOID'], res))
-        # containing = row['geometry']
-
-serving_area = pnt.buffer(0.05)
-
-targ_pnts = gpd.GeoDataFrame([serving_area])
-targ_pnts.columns = ['geometry']
-targ_pnts.set_geometry('geometry')
 
 f, ax = plt.subplots(figsize=(8, 6))
-bun_geo.plot(ax=ax, cmap='BrBG', alpha=0.5, edgecolor='k')
-targ_pnts.plot(ax=ax, alpha=0.5, edgecolor='k')
+bun_geo.plot(ax=ax, cmap='BrBG', alpha=0.2, edgecolor='k')
+target_loc.plot(color='red', ax=ax, alpha=1.0, edgecolor='k')
 f.show()
-f.savefig("generated_maps/targ_with_bg.png")
+f.savefig("generated_maps/targ_address_with_bg.png")
 
-for index, row in bun_geo.iterrows():
-    res = serving_area.intersection(row['geometry'])
-    if res:
-        print("Found intersection with {}".format(row['GEOID'], res))
-        # containing = row['geometry']
+circles = target_loc['geometry'].buffer(0.05)
+circles_df = gpd.GeoDataFrame(circles)
+circles_df.geometry = circles
+
+f, ax = plt.subplots(figsize=(8, 6))
+bun_geo.plot(ax=ax, cmap='BrBG', alpha=0.2, edgecolor='k')
+circles_df.plot(color='red', ax=ax, alpha=1.0, edgecolor='k')
+f.show()
+
+food_coverage = gpd.overlay(bun_geo, circles_df, how='intersection')
+
+f, ax = plt.subplots(figsize=(8, 6))
+food_coverage.plot(ax=ax, cmap='BrBG', alpha=0.2, edgecolor='k')
+# circles.plot(color='red', ax=ax, alpha=1.0, edgecolor='k')
+f.show()
