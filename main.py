@@ -30,10 +30,9 @@ target_address = '627 Swannanoa River Road Asheville, NC 28805-2445'
 if len(sys.argv) == 2:
     target_address = sys.argv[1]
 
-print("Geocoding: {}".format(sys.argv[1]))
+print("Geocoding: {}".format(target_address))
 
-target_loc = gpd.tools.geocode([target_address],
-                               provider='nominatim', )
+target_loc = gpd.tools.geocode(target_address, provider='nominatim')
 
 # we have a successful geocode
 assert len(target_loc) == 1
@@ -81,7 +80,7 @@ target_pnts_df = gpd.GeoDataFrame(target_loc)
 # target_pnts_df.crs = {'init' : mercator_crs}
 # target_pnts_df.to_crs(epsg=mercator_crs)
 
-circles = target_pnts_df['geometry'].buffer(0.04)
+circles = target_pnts_df['geometry'].buffer(0.02)
 circles_df = gpd.GeoDataFrame(circles)
 circles_df.geometry = circles
 circles_df.crs = {'init': 'GRS80'}
@@ -112,11 +111,14 @@ food_coverage.plot(ax=ax, cmap='BrBG', alpha=0.2, edgecolor='k')
 # f.show()
 f.savefig('generated_maps/selected_blockgroups.png')
 
-bun_geo_mecator = bun_geo.to_crs(epsg=3857)
-f, ax = plt.subplots(figsize=(8, 6))
-bun_geo_mecator.plot(figsize=(30, 30), alpha=0.2, edgecolor='k', cmap='YlGnBu', ax=ax)
-add_basemap(ax, zoom=10, url=ctx.sources.OSM_B)
-f.show()
+
+# This works -- as an example of a basemap
+
+# bun_geo_mecator = bun_geo.to_crs(epsg=3857)
+# f, ax = plt.subplots(figsize=(8, 6))
+# bun_geo_mecator.plot(figsize=(30, 30), alpha=0.2, edgecolor='k', cmap='YlGnBu', ax=ax)
+# add_basemap(ax, zoom=10, url=ctx.sources.OSM_B)
+# f.show()
 
 food_coverage['covered_area'] = food_coverage['geometry'].area
 
@@ -163,7 +165,7 @@ work with food locations
 food_geo = gpd.read_file(shapefile_dir + "food_locs.shp")
 print('loaded {} food sources'.format(len(food_geo)))
 
-cont_res = pd.DataFrame(columns=['store name', 'address', 'type'])
+cont_res = pd.DataFrame(columns=['store name', 'address', 'type', 'geometry'])
 for index, row in food_coverage.iterrows():
     # bg_name = row['GEOID']
     bg_geo = row['geometry']
@@ -173,11 +175,32 @@ for index, row in food_coverage.iterrows():
             # containment_result =  containment_result.append([row['STORE_NAME'], row['ADDRESS']])
             cont_res = cont_res.append({'store name': row['STORE_NAME'],
                                         'address': row['ADDRESS'],
-                                        'type': row['type']
+                                        'type': row['type'],
+                                        'geometry': row['geometry']
                                         },
                                        ignore_index=True)
 
 cont_res.sort_values(['type'], inplace=True)
+
+available_food_gpd = gpd.GeoDataFrame(cont_res, geometry='geometry')
+
+food_coverage_mecator = food_coverage.to_crs(epsg=3857)
+available_food_gpd.crs = {'init': 'epsg:4326'}
+available_food_gpd_mercator = available_food_gpd.to_crs(epsg=3857)
+
+
+f, ax = plt.subplots(figsize=(16, 12))
+food_coverage_mecator.plot(figsize=(30, 30), alpha=0.2, edgecolor='k', cmap='YlGnBu', ax=ax)
+available_food_gpd_mercator.plot(ax=ax, color='red', alpha=0.7, edgecolor='k')
+
+food_coverage_mecator.apply(lambda x: ax.annotate(s=x.GEOID, xy=x.geometry.centroid.coords[0],
+                                          ha='center', fontsize=8, color='gray', alpha=0.8),axis=1)
+available_food_gpd_mercator.apply(lambda x: ax.annotate(s=x['store name'], xy=x.geometry.centroid.coords[0],
+                                          ha='center', fontsize=12, color='blue'),axis=1)
+f.savefig('generated_maps/food_in_area.png')
+
+add_basemap(ax, zoom=14, url=ctx.sources.OSM_B)
+f.savefig('generated_maps/food_in_area.png')
 
 # print(result_df[['covered_pop', 'num_unemp', 'num_nohs', 'num_inc_under_50' ]])
 
